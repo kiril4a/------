@@ -3,8 +3,9 @@ from PyQt6.QtWidgets import QApplication, QMenu, QWidget, QVBoxLayout, QLabel, Q
 from PyQt6.QtCore import QPoint, QRect, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPen, QFont, QBrush, QAction, QPixmap
 import os
-from database import get_parking_spots
-from models.car import Car
+from database import get_parking_spots, get_parking_spot_by_id
+from models.car import Car, CarGenerator
+from ui.animations import CarAnimation
 from models.parking_spot import ParkingSpot
 import time
 
@@ -30,7 +31,7 @@ def get_clicked_spot(x, y, spots):
     return None  # Якщо не потрапили в жодне місце
 
 class ParkingWidget(QWidget):
-    def __init__(self):
+    def __init__(self, car_generator):
         super().__init__()
         self.setWindowTitle("Паркінг")
         self.setGeometry(100, 100, 1280, 1024)
@@ -40,11 +41,11 @@ class ParkingWidget(QWidget):
         self.timer.start(frame_rate)
         self.popup = None
         self.clicked_spot = None
-        main_layout = QHBoxLayout(self)
+        self.main_layout = QHBoxLayout(self)
 
         # Додаємо паркувальну зону (лівий блок)
         self.parking_area = QWidget(self)
-        main_layout.addWidget(self.parking_area)
+        self.main_layout.addWidget(self.parking_area)
 
         # Завантажуємо зображення воріт
         self.gate_label = QLabel(self)
@@ -56,16 +57,28 @@ class ParkingWidget(QWidget):
         else:
             self.gate_label.setPixmap(pixmap)
             self.gate_label.setScaledContents(True)  # Масштабувати під розмір QLabel
+         # Додаємо зображення воріт у праву частину екрану
+        self.main_layout.addWidget(self.gate_label)
 
-        # Додаємо зображення воріт у праву частину екрану
-        main_layout.addWidget(self.gate_label)
+        # **Отримуємо генератор машин із main.py**
+        self.car_generator = car_generator
+        self.car_generator.car_created.connect(self.start_car_animation)  # Підключаємо сигнали
+        self.car_generator.car_leaving.connect(self.start_exit_animation)
+    def start_car_animation(self, plate_number, spot_id):
+        spot = get_parking_spot_by_id(spot_id)
+        car_animation = CarAnimation(self, plate_number, spot)
+        car_animation.show()
+        car_animation.animate_entry()
 
-        self.setLayout(main_layout)
+    def start_exit_animation(self, plate_number):
+        for child in self.findChildren(CarAnimation):
+            if child.plate_number == plate_number:
+                child.animate_exit()
+
     def update_parking_status(self):
         # Перезавантажуємо дані з БД (або іншим способом)
         self.spots = get_parking_spots()  # Оновлення паркувальних місць з БД
         self.update()  # Оновлюємо екран (викликає paintEvent)
-
 
     def paintEvent(self, event):
 
@@ -132,7 +145,7 @@ class ParkingWidget(QWidget):
         # Отримуємо координати кліка через pos()
         x = event.position().x()
         y = event.position().y()
-
+        print(x,y)
         # Перевіряємо, яке паркувальне місце було натиснуте
         clicked_spot = get_clicked_spot(x, y, self.spots)
         self.clicked_spot = clicked_spot

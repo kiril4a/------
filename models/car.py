@@ -4,8 +4,8 @@ import time
 import threading
 from database import get_all_cars, get_parking_spot_by_id, car_exists, add_car_to_db, remove_car_from_db, get_parking_spots
 from models.parking_spot import ParkingSpot
-GEN_SLEEP = 10
-MAX_TIME_PARK = 20
+GEN_SLEEP = 2
+MAX_TIME_PARK = 200
 class Car:
     def __init__(self, plate_number: str, parking_spot: int = None, arrival_time: int = None, departure_time: int = None):
         self.plate_number = plate_number
@@ -34,43 +34,56 @@ class Car:
     def __repr__(self):
         return f"Car(plate_number='{self.plate_number}', parking_spot={self.parking_spot}, arrival_time={self.arrival_time}, departure_time={self.departure_time})"
 
-def generate_car(car_id):
-    """Генерує авто, паркує та виїжджає через випадковий час."""
-    plate_number = f"ABC{car_id:03d}"
-    car = Car(plate_number)
-    spots = get_parking_spots()
-    for spot in spots:
-        if spot.is_free():
-            car.park(spot)
-            print(f"Авто {plate_number} припарковане на місці {spot.spot_id}")
-            break
-    print(f"Авто {plate_number} паркується на {car.departure_time-car.arrival_time} секунд.")
+class CarGenerator(QObject):
+    car_created = pyqtSignal(str, int)  # Передаємо номер авто і паркомісце
+    car_leaving = pyqtSignal(str)
 
-def car_generator():
-    """Цикл генерації авто."""
-    car_id = 1
-    while True:
-        generate_car(car_id)
-        car_id += 1
-        time.sleep(GEN_SLEEP)
+    def __init__(self):
+        super().__init__()
 
-def start_car_generation():
-    """Запуск генерації авто в окремому потоці."""
-    generator_thread = threading.Thread(target=car_generator, daemon=True)
-    exit_thread = threading.Thread(target=process_parked_cars, daemon=True)
-    
-    exit_thread.start()
-    generator_thread.start()
+    def generate_car(self, car_id):
+        """Генерує авто, паркує та надсилає сигнал для анімації."""
+        plate_number = f"ABC{car_id:03d}"
+        car = Car(plate_number)
+        spots = get_parking_spots()
 
-
-def process_parked_cars():
-    """Постійно перевіряє всі автомобілі в БД та виїжджає ті, у яких минув час паркування."""
-    while True:
-        cars = get_all_cars()
-        current_time = int(time.time()) 
-        for car in cars:
-            if car.departure_time and current_time >= car.departure_time:
-                print(f"Авто {car.plate_number} виїжджає з місця {car.parking_spot}")
-                car.leave()  # Видаляємо авто з БД
+        for spot in spots:
+            if spot.is_free():
+                car.park(spot)
+                print(f"Авто {plate_number} припарковане на місці {spot.spot_id}")
                 
-        time.sleep(1)  # Перевіряємо кожні 5 секунд
+                # Надсилаємо сигнал для запуску анімації
+                self.car_created.emit(plate_number, spot.spot_id)
+                break
+
+    def car_generator(self):
+        """Цикл генерації авто."""
+        car_id = 1
+        while True:
+            self.generate_car(car_id)
+            car_id += 1
+            time.sleep(GEN_SLEEP)
+
+    def start_car_generation(self):
+        """Запуск генерації авто в окремому потоці."""
+        generator_thread = threading.Thread(target=self.car_generator, daemon=True)
+        exit_thread = threading.Thread(target=self.process_parked_cars, daemon=True)
+        
+        exit_thread.start()
+        generator_thread.start()
+
+    def process_parked_cars(self):
+        """Постійно перевіряє всі автомобілі в БД та виїжджає ті, у яких минув час паркування."""
+        while True:
+            cars = get_all_cars()
+            current_time = int(time.time()) 
+            for car in cars:
+                if car.departure_time and current_time >= car.departure_time:
+                    print(f"Авто {car.plate_number} виїжджає з місця {car.parking_spot}")
+                    self.car_leaving.emit(car.plate_number)
+
+                    # Даємо час для анімації
+                    time.sleep(3)
+                    car.leave()  # Видаляємо авто з БД
+                    
+            time.sleep(1)  # Перевіряємо кожні 5 секунд

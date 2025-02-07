@@ -1,9 +1,10 @@
-from ui.display import main_visual, get_parking_layout
-from models.car import start_car_generation
+from ui.display import main_visual, get_parking_layout,ParkingWidget
+from models.car import CarGenerator  # Імпортуємо клас, а не функцію
 from models.parking_spot import create_parking_layout
 from database import create_database
 import sqlite3 
-
+import sys
+from PyQt6.QtWidgets import QApplication 
 DATABASE = 'parking.db'
 
 rows, cols = get_parking_layout()
@@ -23,10 +24,21 @@ def setup_parking():
     create_database()
     clear_parking_spots()
 
+def generation():
+    app = QApplication(sys.argv)
 
+    # Створюємо генератор машин
+    car_generator = CarGenerator()
+
+    # Передаємо генератор у ParkingWidget
+    parking_widget = ParkingWidget(car_generator)
+    parking_widget.show()
+
+    car_generator.start_car_generation()  # Запускаємо генерацію машин
+
+    sys.exit(app.exec())
 if __name__ == "__main__":
     setup_parking()
     create_parking_layout()
-    start_car_generation()
-    #park_car()
+    generation()
     main_visual()
