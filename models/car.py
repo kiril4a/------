@@ -4,7 +4,7 @@ import time
 import threading
 from database import get_all_cars, get_parking_spot_by_id, car_exists, add_car_to_db, remove_car_from_db, get_parking_spots
 from models.parking_spot import ParkingSpot
-GEN_SLEEP = 5
+GEN_SLEEP = 1
 MAX_TIME_PARK = 40
 class Car:
     def __init__(self, plate_number: str, parking_spot: int = None, arrival_time: int = None, departure_time: int = None):

@@ -4,7 +4,7 @@ from PyQt6.QtGui import QPixmap, QTransform, QPainter
 import math
 radius = 45
 step_rotation = 5
-def calculate_duration(coord1, coord2, speed=2):
+def calculate_duration(coord1, coord2, speed=5):
     """Розраховує час (duration) для анімації на основі відстані між координатами.
     
     coord1, coord2 — початкова і кінцева координати (X або Y).
@@ -84,19 +84,19 @@ class CarAnimation(QLabel):
         :param radius: Радіус повороту.
         :param callback: Функція, яка викличеться після завершення повороту.
         """
-        angle_direction = 1 if target_angle > self.current_angle else 1
+        angle_direction = 1 if target_angle > self.current_angle else -1
         
         # 1. Обчислюємо центр обертання
         center_x = self.x() + self.width() // 2
-        center_y = self.y() - radius
+        center_y = self.y() - radius if angle_direction == 1 else self.y() + radius + self.height()
         center = (center_x, center_y)
 
-        print(f"Центр обертання: {center}")
-
+        
+        #print(f"Центр обертання: {center}")
+        #print(self.x(), self.width())
+        rotate_point((self.x(),self.y()),center,-90)
         def step():
             nonlocal center
-
-            #print(f"Перед переміщенням: x = {self.x()}, y = {self.y()}, кут = {self.current_angle}")
 
             if abs(self.current_angle - target_angle) < step_rotation:
                 self.current_angle = target_angle
@@ -107,10 +107,8 @@ class CarAnimation(QLabel):
             figure_center_x = self.x() + self.width() // 2
             figure_center_y = self.y() + self.height() // 2
             figure_center = (figure_center_x, figure_center_y)
-            print(figure_center,"figure")
+            #print(figure_center, "figure")
             new_figure_center = rotate_point(center, figure_center, step_rotation * angle_direction)
-
-            print(new_figure_center)
 
             # 3. Повертаємо зображення без зміни його розміру
             transform = QTransform()
@@ -125,16 +123,11 @@ class CarAnimation(QLabel):
             # 4. Обчислюємо новий верхній лівий кут
             new_x = new_figure_center[0] - new_width // 2
             new_y = new_figure_center[1] - new_height // 2
+            #print(new_x, new_y)
 
             # 5. Оновлюємо рамку та переміщуємо авто
             self.setPixmap(rotated_pixmap)
             self.setGeometry(int(new_x), int(new_y), new_width, new_height)
-
-
-            # 5. Переміщуємо авто
-            #self.move(int(new_x), int(new_y))
-
-            #print(f"Після переміщення: x = {new_x}, y = {new_y}")
 
             # Перевіряємо, чи завершився поворот
             if self.current_angle == target_angle:
@@ -142,9 +135,69 @@ class CarAnimation(QLabel):
                     callback()
                 return
 
-            QTimer.singleShot(calculate_duration(0,distance(new_figure_center,figure_center)), step)
+            QTimer.singleShot(calculate_duration(0, distance(new_figure_center, figure_center)), step)
 
         step()
+
+    def rotate2(self, target_angle, callback=None):
+        """
+        Плавно повертає автомобіль навколо заданого радіусу.
+
+        :param target_angle: Кут, на який треба повернути (+90 або -90 градусів).
+        :param callback: Функція, яка викличеться після завершення повороту.
+        """
+        angle_direction = 1 if target_angle > self.current_angle else -1
+
+        # 1. Обчислюємо центр обертання (залежно від напряму)
+        center_x = self.x() - radius
+        center_y = self.y() + self.height() // 2
+        center = (center_x, center_y)
+
+        print(f"Центр обертання: {center}")
+
+        def step():
+            nonlocal center
+
+            if abs(self.current_angle - target_angle) < step_rotation:
+                self.current_angle = target_angle
+            else:
+                self.current_angle += step_rotation * angle_direction
+            
+            figure_center_x = self.x() + self.width() // 2
+            figure_center_y = self.y() + self.height() // 2
+            figure_center = (figure_center_x, figure_center_y)
+            new_figure_center = rotate_point(center, figure_center, step_rotation * angle_direction)
+
+            # 3. Повертаємо зображення
+            transform = QTransform()
+            transform.rotate(self.current_angle)
+            rotated_pixmap = self.original_pixmap.transformed(transform, Qt.TransformationMode.SmoothTransformation)
+
+            # 4. Отримуємо нові розміри рамки
+            new_rect = rotated_pixmap.rect()
+            new_width = new_rect.width()
+            new_height = new_rect.height()
+
+            # 5. Оновлюємо позицію
+            new_x = new_figure_center[0] - new_width // 2
+            new_y = new_figure_center[1] + new_height // 2 if angle_direction == 1 else new_figure_center[1] - new_height // 2
+
+            if angle_direction == 1 :
+                print(new_figure_center)
+
+            self.setPixmap(rotated_pixmap)
+            self.setGeometry(int(new_x), int(new_y), new_width, new_height)
+
+            # Завершення анімації
+            if self.current_angle == target_angle:
+                if callback:
+                    callback()
+                return
+
+            QTimer.singleShot(calculate_duration(0, distance(new_figure_center, figure_center)), step)
+
+        step()
+
 
 
 
@@ -164,28 +217,35 @@ class CarAnimation(QLabel):
         #pause_before_rotate1 = QPauseAnimation(100)
         
         # Перший поворот (правильний варіант)
-        rotate_animation = QPauseAnimation(100)
+        rotate_animation = QPauseAnimation(1)
         #rotate_animation.setDuration(calculate_duration(0, 90)+1000)
         rotate_angle = 90 if self.get_nearest_parking_line((self.spot.y1 + self.spot.y2) // 2) < self.start_y else -90
         rotate_animation.finished.connect(lambda: self.rotate(rotate_angle))
 
-        pause_before_rotate1 = QPauseAnimation(2000)
+        pause_before_rotate1 = QPauseAnimation(calculate_duration(0,2*3.14*radius//4)*2)
         # 1. Спускаємося або піднімаємося до найближчої Y-лінії
         target_y = self.get_nearest_parking_line((self.spot.y1 + self.spot.y2)//2)
         move_y = QPropertyAnimation(self, b"pos")
-        move_y.setDuration(calculate_duration(self.start_y, target_y))
-        move_y.setStartValue(QPoint(1000, self.start_y))
-        move_y.setEndValue(QPoint(1000, target_y))
-
+        X=950
+        if target_y > self.y():
+            move_y.setDuration(calculate_duration(self.start_y - radius - self.height(), target_y))
+            move_y.setStartValue(QPoint(935, 540))
+            move_y.setEndValue(QPoint(935, target_y))
+            X = 935
+        else:
+            move_y.setDuration(calculate_duration(self.start_y - radius - self.height(), target_y))
+            move_y.setStartValue(QPoint(950, 395))
+            move_y.setEndValue(QPoint(950, target_y))
+            X = 950
+        
         print(f"Авто {self.plate_number} рухається до Y = {target_y}")
 
-        # Пауза перед другим поворотом
-        #pause_before_rotate2 = QPauseAnimation(100)
-
         # Другий поворот
-        rotate_animation_second = QPauseAnimation(100)
-        rotate_angle_2 = 0 if self.get_nearest_parking_line((self.spot.y1 + self.spot.y2)//2) < (self.start_y) else 90
-        rotate_animation_second.finished.connect(lambda: self.rotate(rotate_angle_2))
+        rotate_animation_second = QPauseAnimation(1)
+        rotate_angle_2 = 0 if self.get_nearest_parking_line((self.spot.y1 + self.spot.y2)//2) < (self.start_y) else 0
+        rotate_animation_second.finished.connect(lambda: self.rotate2(rotate_angle_2))
+
+        pause_before_rotate2 = QPauseAnimation(calculate_duration(0,2*3.14*radius//4)*2)
 
         # 2. Рухаємося вліво до парковки
         move_x = QPropertyAnimation(self, b"pos")
@@ -219,8 +279,8 @@ class CarAnimation(QLabel):
         self.entry_sequence.addAnimation(rotate_animation)
         self.entry_sequence.addAnimation(pause_before_rotate1)
         self.entry_sequence.addAnimation(move_y)
-        #self.entry_sequence.addAnimation(pause_before_rotate2)
-        #self.entry_sequence.addAnimation(rotate_animation_second)
+        self.entry_sequence.addAnimation(rotate_animation_second)
+        self.entry_sequence.addAnimation(pause_before_rotate2)
         self.entry_sequence.addAnimation(move_x)
         #self.entry_sequence.addAnimation(pause_before_rotate3)
         #self.entry_sequence.addAnimation(rotate_animation_vertical)
