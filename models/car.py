@@ -51,7 +51,7 @@ class CarGenerator(QObject):
         spots = get_parking_spots()
 
         for spot in spots:
-            with spot.lock:  # 🔒 захищаємо всю перевірку + паркування
+            with spot.lock:  # захищаємо всю перевірку + паркування
                 if spot.is_free():
                     car.park(spot)
                     self.car_created.emit(plate_number, spot.spot_id)

@@ -11,7 +11,7 @@ class ParkingSpot:
         self.x2 = x + SPOT_WIDTH
         self.y2 = y + SPOT_HEIGHT
         self.status = status
-        self.lock = RLock()  # 🔒 Захищаємо критичні секції
+        self.lock = RLock()  # Захищаємо критичні секції
 
     def contains(self, x, y):
         return self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2

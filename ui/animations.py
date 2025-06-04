@@ -49,7 +49,7 @@ class CarAnimation(QLabel):
         self.plate_number = plate_number
         self.spot = spot  
         self.current_angle = 0
-        self.original_pixmap = QPixmap("image/car.png").scaled(80, 45)
+        self.original_pixmap = QPixmap("image/car2.png").scaled(80, 45)
         self.setPixmap(self.original_pixmap)
         self.setScaledContents(True)
 
